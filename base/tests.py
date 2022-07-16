@@ -1,18 +1,17 @@
-from email import header
-import json
-from wsgiref import headers
 from django.test import TestCase, Client
 from django.contrib.auth.models import User
-from mock import MagicMock, patch
+from rest_framework.test import APIClient
 
 # Create your tests here.
 
 class MyTests(TestCase):
     def setUp(self) -> None:
-        return super().setUp()
+        super().setUp()
+        self.client = Client()
 
     def _create_simple_user(self):
-        User.objects.create_user(username='user_001', email='user_001@example.com', password='user_001_password', is_active=True)        
+        user = User.objects.create_user(username='user_001', email='user_001@example.com', password='user_001_password', is_active=True)
+        user.save()
 
     def test__unauthorized_acess__expected_error_401(self):
         c = Client()
@@ -23,8 +22,10 @@ class MyTests(TestCase):
     def test__authorized_acess_with_token__expected_success(self):
         self._create_simple_user()
 
-        c = Client()
-        response = c.post('/api/token/', {
+        user = User.objects.get(username='user_001')
+        user.refresh_from_db()
+
+        response = self.client.post('/api/token/', {
             "username": "user_001",
             "password": "user_001_password"
         })
@@ -34,8 +35,11 @@ class MyTests(TestCase):
         self.assertFalse(json_response.get('refresh', False) == False)
         self.assertFalse(json_response.get('access', False) == False)
 
-        header={'Authorization': f"Bearer {json_response['access']}"}
-        response = c.get('/api/', **header)
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION='Bearer ' + json_response['access'])
+        response_2 = client.get('/api/', data={'format': 'json'})
 
-        self.assertEqual(200, response.status_code)
-        self.assertEqual('success', response.json()['msg'])
+        json_response_2 = response_2.json()
+
+        self.assertEqual(200, response_2.status_code)
+        self.assertEqual('success', json_response_2['msg'])
