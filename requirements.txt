@@ -1,4 +1,6 @@
 django==4.0.6
 djangorestframework==3.13.1
 djangorestframework-simplejwt==5.2.0
-mock
+# Libs for tests
+mock==4.0.3
+freezegun==1.2.1
