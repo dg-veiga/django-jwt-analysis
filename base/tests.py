@@ -6,12 +6,6 @@ from rest_framework.test import APIClient
 
 # Create your tests here.
 
-class FakeDateTime(datetime):
-    "A manipulable datetime replacement"
-    def __new__(cls, *args, **kwargs):
-        return datetime.__new__(datetime, *args, **kwargs)
-
-
 class MyTests(TestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -112,6 +106,43 @@ class MyTests(TestCase):
 
         # settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'] is set to 5 minutes
         with freeze_time("2021-01-01 12:04:00"):
+            client = APIClient()
+            client.credentials(HTTP_AUTHORIZATION='Bearer ' + token)
+            response_2 = client.get('/api/', data={'format': 'json'})
+
+            json_response_2 = response_2.json()
+
+            self.assertEqual(200, response_2.status_code)
+            self.assertEqual('success', json_response_2['msg'])
+
+    def test__access_authorized_after_refresh_token__expected_success(self):
+        self._create_simple_user()
+
+        token = None
+        refresh_token = None
+
+        with freeze_time("2021-01-01 12:00:00"):
+            response = self.client.post('/api/token/', {
+                "username": "user_001",
+                "password": "user_001_password"
+            })
+
+            json_response = response.json()
+            token = json_response['access']
+            refresh_token = json_response['refresh']
+
+            self.assertFalse(json_response.get('refresh', False) == False)
+            self.assertFalse(json_response.get('access', False) == False)
+
+        # settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'] is set to 5 minutes
+        with freeze_time("2021-01-01 13:00:00"):
+            response = self.client.post('/api/token/refresh/', {
+                "refresh": refresh_token
+            })
+
+            json_response = response.json()
+            token = json_response['access']
+
             client = APIClient()
             client.credentials(HTTP_AUTHORIZATION='Bearer ' + token)
             response_2 = client.get('/api/', data={'format': 'json'})
