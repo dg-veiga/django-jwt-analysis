@@ -151,3 +151,34 @@ class MyTests(TestCase):
 
             self.assertEqual(200, response_2.status_code)
             self.assertEqual('success', json_response_2['msg'])
+
+    def test__token_refresh_unauthorized_after_refresh_token_is_expired__expected_failure(self):
+        self._create_simple_user()
+
+        token = None
+        refresh_token = None
+
+        with freeze_time("2021-01-01 12:00:00"):
+            response = self.client.post('/api/token/', {
+                "username": "user_001",
+                "password": "user_001_password"
+            })
+
+            json_response = response.json()
+            token = json_response['access']
+            refresh_token = json_response['refresh']
+
+            self.assertFalse(json_response.get('refresh', False) == False)
+            self.assertFalse(json_response.get('access', False) == False)
+
+        # settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'] is set to 1 day
+        with freeze_time("2021-01-02 12:01:00"):
+            response = self.client.post('/api/token/refresh/', {
+                "refresh": refresh_token
+            })
+
+            json_response = response.json()
+
+            self.assertEqual(401, response.status_code)
+            self.assertEqual('Token is invalid or expired', json_response['detail'])
+            self.assertEqual('token_not_valid', json_response['code'])
